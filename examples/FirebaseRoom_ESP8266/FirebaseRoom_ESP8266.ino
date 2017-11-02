@@ -21,29 +21,26 @@
 #include <FirebaseArduino.h>
 
 // Set these to run example.
-#define FIREBASE_HOST "example.firebaseio.com"
-#define FIREBASE_AUTH "token_or_secret"
-#define WIFI_SSID "SSID"
-#define WIFI_PASSWORD "PASSWORD"
+#define FIREBASE_HOST "aib-object.firebaseio.com"
+#define FIREBASE_AUTH "Jh04XGLCRZco3K0EBwxXrSoaEY8zGUi9x5MS1WcJ"
+#define WIFI_SSID "yale wireless"
+#define WIFI_PASSWORD ""
 
-const int grovePowerPin = 15;
-const int vibratorPin = 5;
-const int lightSensorPin = A0;
-const int ledPin = 12;
-const int buttonPin = 14;
-const int fanPin = 13;
-
+//set led to pin built in led
+const int led = BUILTIN_LED;
+int brightness = 0;    // how bright the LED is
+int fadeAmount = 100;    // how many points to fade the LED by
+int pattern = 0; // enum, 0 --> start/neutral, 1 --> fade, 2 --> blink
+String mac = WiFi.macAddress();
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
+  delay(500);
 
-  pinMode(grovePowerPin, OUTPUT);
-  digitalWrite(grovePowerPin, HIGH);
+   Serial.println();
+   Serial.print("MAC: ");
+   Serial.println();
 
-  pinMode(vibratorPin, OUTPUT);
-  pinMode(lightSensorPin, INPUT);
-  pinMode(ledPin, OUTPUT);
-  pinMode(buttonPin, INPUT);
-  pinMode(fanPin, OUTPUT);
+  pinMode(led, OUTPUT);
 
   // connect to wifi.
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -57,29 +54,31 @@ void setup() {
   Serial.println(WiFi.localIP());
 
   Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
-  Firebase.set("pushbutton", 0);
-  Firebase.set("sunlight", 0);
-  Firebase.set("redlight", 0);
-  Firebase.set("cooldown", 0);
-  Firebase.set("brrr", 0);
+  // Firebase.setString("Mac", mac);
+  Firebase.set(mac + "/pattern", 0);
+  Firebase.set(mac + "/brightness", 255);
 }
 
-int button = 0;
-float light = 0.0;
-
 void loop() {
-  digitalWrite(ledPin, Firebase.getInt("redlight"));
-  digitalWrite(fanPin, Firebase.getInt("cooldown"));
-  digitalWrite(vibratorPin, Firebase.getInt("brrr"));
-  int newButton = digitalRead(buttonPin);
-  if (newButton != button) {
-    button = newButton;
-    Firebase.setInt("pushbutton", button);
+
+  pattern = Firebase.getInt(mac+ "/pattern");
+  if (pattern == 0){ // manual control
+    brightness = Firebase.getInt(mac + "/brightness")
+  } else if (pattern == 1){ // fade
+    brightness = brightness + fadeAmount;
+
+    // reverse the direction of the fading at the ends of the fade:
+    if (brightness <= 0 || brightness >= 1023) {
+      fadeAmount = -fadeAmount;
+    }
+  } else if (pattern == 2){ // blink
+    brightness = brightness < 500 ? 500 : 0;
   }
-  float newLight = analogRead(lightSensorPin);
-  if (abs(newLight - light) > 100) {
-    light = newLight;
-    Firebase.setFloat("sunlight", light);
-  }
-  delay(200);
+
+  // set the brightness of built in led:
+  analogWrite(led, Firebase.getInt(mac + "/brightness"));
+
+  Serial.println(brightness);
+  // wait for 100 milliseconds to see the pattern effect
+  delay(100);
 }
